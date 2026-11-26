@@ -1,0 +1,6 @@
+{
+  "name": "TuturSuara",
+  "description": "Aplikasi Text-to-Speech Bahasa Indonesia yang simpel dengan pilihan suara pria natural, pemutar audio langsung, dan unduhan WAV/MP3.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
