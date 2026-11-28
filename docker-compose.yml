@@ -1,0 +1,16 @@
+services:
+  tutursuara:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tutursuara-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3005}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    env_file:
+      - path: .env
+        required: false

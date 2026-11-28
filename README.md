@@ -51,6 +51,23 @@ PORT=3000
 ```
 
 ### 3. Menjalankan Aplikasi
+
+#### Opsi A: Menggunakan Docker (Direkomendasikan)
+Pastikan Docker sudah berjalan di sistem Anda, lalu jalankan:
+```bash
+docker compose up -d --build
+```
+Aplikasi dapat diakses melalui browser di:
+```
+http://localhost:3005
+```
+
+Untuk menghentikan container:
+```bash
+docker compose down
+```
+
+#### Opsi B: Menggunakan Node.js Lokal
 Jalankan server aplikasi dalam mode pengembangan:
 ```bash
 npm run dev
