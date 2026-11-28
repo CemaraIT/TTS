@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Check,
   Download,
   Eraser,
+  KeyRound,
   Loader2,
   Mic,
   Play,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { AudioPlayerCard } from "./components/AudioPlayerCard";
 import { Header } from "./components/Header";
+import { SettingsModal } from "./components/SettingsModal";
 import {
   MALE_VOICES,
   SAMPLE_SCRIPTS,
@@ -20,6 +22,7 @@ import {
 import type { GeneratedAudioTake, MaleVoiceId } from "./types/tts";
 
 const MAX_CHARS = 5000;
+const API_KEY_STORAGE_KEY = "tutursuara_gemini_api_key";
 
 function formatDurationBadge(seconds: number): string {
   const rounded = Math.max(1, Math.round(seconds));
@@ -62,9 +65,51 @@ export default function App() {
 
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isApiKeyError, setIsApiKeyError] = useState<boolean>(false);
   const [activeTake, setActiveTake] = useState<GeneratedAudioTake | null>(null);
   const [history, setHistory] = useState<GeneratedAudioTake[]>([]);
   const [sampleCursor, setSampleCursor] = useState<number>(0);
+
+  const [apiKey, setApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [hasServerKey, setHasServerKey] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch("/api/config/status")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.hasServerKey === "boolean") {
+          setHasServerKey(data.hasServerKey);
+        }
+      })
+      .catch(() => {
+        // Abaikan jika gagal mengecek status awal
+      });
+  }, []);
+
+  const handleSaveApiKey = (newKey: string) => {
+    const clean = newKey.trim();
+    setApiKey(clean);
+    try {
+      if (clean) {
+        localStorage.setItem(API_KEY_STORAGE_KEY, clean);
+      } else {
+        localStorage.removeItem(API_KEY_STORAGE_KEY);
+      }
+    } catch {
+      // Abaikan jika localStorage diblokir
+    }
+    if (isApiKeyError) {
+      setIsApiKeyError(false);
+      setErrorMessage(null);
+    }
+  };
 
   const selectedStyle = useMemo(
     () =>
@@ -113,6 +158,7 @@ export default function App() {
     }
 
     setErrorMessage(null);
+    setIsApiKeyError(false);
     setIsGenerating(true);
 
     const combinedStyle = customStyleNote.trim()
@@ -120,9 +166,16 @@ export default function App() {
       : selectedStyle.promptStyle;
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (apiKey.trim()) {
+        headers["x-gemini-api-key"] = apiKey.trim();
+      }
+
       const response = await fetch("/api/tts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           text: cleanText,
           voiceName: selectedVoice,
@@ -133,6 +186,12 @@ export default function App() {
       const payload = await response.json();
 
       if (!response.ok) {
+        const keyErr =
+          payload?.code === "MISSING_API_KEY" ||
+          payload?.code === "INVALID_API_KEY" ||
+          response.status === 401 ||
+          response.status === 403;
+        setIsApiKeyError(keyErr);
         throw new Error(
           payload?.error || "Terjadi kesalahan saat membuat suara."
         );
@@ -194,6 +253,8 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header
         onLoadSample={handleCycleSample}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        hasConfiguredKey={Boolean(apiKey.trim()) || hasServerKey}
         historyCount={history.length}
       />
 
@@ -267,13 +328,25 @@ export default function App() {
               {errorMessage && (
                 <div
                   role="alert"
-                  className="mt-3 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800"
+                  className="mt-3 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-800"
                 >
-                  <AlertCircle
-                    className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
-                    aria-hidden="true"
-                  />
-                  <span>{errorMessage}</span>
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle
+                      className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
+                      aria-hidden="true"
+                    />
+                    <span>{errorMessage}</span>
+                  </div>
+                  {isApiKeyError && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-red-700"
+                    >
+                      <KeyRound className="h-3 w-3" aria-hidden="true" />
+                      Buka Pengaturan API
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -584,6 +657,14 @@ export default function App() {
           )}
         </section>
       </main>
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        apiKey={apiKey}
+        hasServerKey={hasServerKey}
+        onSaveApiKey={handleSaveApiKey}
+      />
     </div>
   );
 }

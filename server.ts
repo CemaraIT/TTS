@@ -181,8 +181,20 @@ function extractWaveformPeaks(pcmData: Buffer, barCount = 48): number[] {
   return rawPeaks.map((p) => Number(Math.max(0.14, Math.min(1, p / peakMax)).toFixed(2)));
 }
 
-function createGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+function resolveApiKey(customKey?: unknown): string | null {
+  const fromClient = typeof customKey === "string" ? customKey.trim() : "";
+  if (fromClient && fromClient !== "MY_GEMINI_API_KEY") {
+    return fromClient;
+  }
+  const fromEnv = (process.env.GEMINI_API_KEY || "").trim();
+  if (fromEnv && fromEnv !== "MY_GEMINI_API_KEY") {
+    return fromEnv;
+  }
+  return null;
+}
+
+function createGeminiClient(customKey?: unknown): GoogleGenAI {
+  const apiKey = resolveApiKey(customKey);
   if (!apiKey) {
     throw new Error("MISSING_GEMINI_API_KEY");
   }
@@ -201,9 +213,45 @@ async function startServer() {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
 
+  app.get("/api/config/status", (_req, res) => {
+    const serverKey = resolveApiKey();
+    res.json({
+      hasServerKey: Boolean(serverKey),
+    });
+  });
+
+  app.post("/api/config/verify", async (req, res) => {
+    try {
+      const customKey =
+        req.headers["x-gemini-api-key"] ?? req.body?.apiKey;
+      const ai = createGeminiClient(customKey);
+      await ai.models.list({ config: { pageSize: 1 } });
+      res.json({ valid: true, message: "API Key valid dan terhubung ke Gemini API." });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage === "MISSING_GEMINI_API_KEY") {
+        res.status(400).json({
+          valid: false,
+          error: "API Key tidak boleh kosong.",
+        });
+        return;
+      }
+      res.status(400).json({
+        valid: false,
+        error: "API Key tidak valid atau ditolak oleh Gemini API.",
+        detail: errorMessage,
+      });
+    }
+  });
+
   app.post("/api/tts", async (req, res) => {
     try {
-      const { text, voiceName, stylePrompt } = req.body ?? {};
+      const { text, voiceName, stylePrompt, apiKey } = req.body ?? {};
+      const headerApiKey = req.headers["x-gemini-api-key"];
+      const customApiKey =
+        typeof headerApiKey === "string" && headerApiKey.trim().length > 0
+          ? headerApiKey
+          : apiKey;
 
       if (typeof text !== "string" || text.trim().length === 0) {
         res.status(400).json({ error: "Naskah teks tidak boleh kosong." });
@@ -230,7 +278,7 @@ async function startServer() {
 
       const effectiveStyle = `Speak naturally in fluent Indonesian (Bahasa Indonesia) with authentic native pronunciation, natural breathing pauses, and human-like intonation. Delivery style: ${cleanStyle}`;
 
-      const ai = createGeminiClient();
+      const ai = createGeminiClient(customApiKey);
 
       const response = await ai.models.generateContent({
         model: "gemini-3.8-flash-tts",
@@ -300,8 +348,9 @@ async function startServer() {
       console.error("[TTS API Error]:", status, errorMessage, err);
 
       if (errorMessage === "MISSING_GEMINI_API_KEY") {
-        res.status(500).json({
-          error: "GEMINI_API_KEY belum tersedia di konfigurasi server (Settings > Secrets).",
+        res.status(401).json({
+          code: "MISSING_API_KEY",
+          error: "Gemini API Key belum diatur. Silakan buka menu Pengaturan di kanan atas untuk memasukkan API key Anda.",
         });
         return;
       }
@@ -310,10 +359,12 @@ async function startServer() {
         status === 403 ||
         errorMessage.includes("403") ||
         errorMessage.includes("PERMISSION_DENIED") ||
-        errorMessage.includes("API_KEY_INVALID")
+        errorMessage.includes("API_KEY_INVALID") ||
+        errorMessage.toLowerCase().includes("api key not valid")
       ) {
         res.status(403).json({
-          error: "Akses Gemini API ditolak atau API key tidak valid. Periksa GEMINI_API_KEY di Settings > Secrets.",
+          code: "INVALID_API_KEY",
+          error: "Akses Gemini API ditolak atau API key tidak valid. Periksa kembali API key Anda melalui menu Pengaturan.",
           detail: errorMessage,
         });
         return;
