@@ -15,11 +15,11 @@ import { AudioPlayerCard } from "./components/AudioPlayerCard";
 import { Header } from "./components/Header";
 import { SettingsModal } from "./components/SettingsModal";
 import {
-  MALE_VOICES,
   SAMPLE_SCRIPTS,
   SPEAKING_STYLES,
+  VOICE_OPTIONS,
 } from "./data/ttsPresets";
-import type { GeneratedAudioTake, MaleVoiceId } from "./types/tts";
+import type { GeneratedAudioTake, VoiceGender, VoiceId } from "./types/tts";
 
 const MAX_CHARS = 5000;
 const API_KEY_STORAGE_KEY = "tutursuara_gemini_api_key";
@@ -55,9 +55,10 @@ function triggerFileDownload(
 
 export default function App() {
   const [text, setText] = useState<string>(SAMPLE_SCRIPTS[0].text);
-  const [selectedVoice, setSelectedVoice] = useState<MaleVoiceId>(
+  const [selectedVoice, setSelectedVoice] = useState<VoiceId>(
     SAMPLE_SCRIPTS[0].recommendedVoice
   );
+  const [voiceFilter, setVoiceFilter] = useState<"all" | VoiceGender>("all");
   const [selectedStyleId, setSelectedStyleId] = useState<string>(
     SAMPLE_SCRIPTS[0].recommendedStyleId
   );
@@ -126,6 +127,14 @@ export default function App() {
     return { chars, words, estSeconds };
   }, [text]);
 
+  const filteredVoices = useMemo(
+    () =>
+      voiceFilter === "all"
+        ? VOICE_OPTIONS
+        : VOICE_OPTIONS.filter((v) => v.gender === voiceFilter),
+    [voiceFilter]
+  );
+
   const handleLoadSampleById = (sampleId: string) => {
     const found = SAMPLE_SCRIPTS.find((s) => s.id === sampleId);
     if (!found) return;
@@ -133,6 +142,10 @@ export default function App() {
     setSelectedVoice(found.recommendedVoice);
     setSelectedStyleId(found.recommendedStyleId);
     setErrorMessage(null);
+    const recVoice = VOICE_OPTIONS.find((v) => v.id === found.recommendedVoice);
+    if (recVoice && voiceFilter !== "all" && voiceFilter !== recVoice.gender) {
+      setVoiceFilter(recVoice.gender);
+    }
   };
 
   const handleCycleSample = () => {
@@ -143,6 +156,10 @@ export default function App() {
     setSelectedVoice(sample.recommendedVoice);
     setSelectedStyleId(sample.recommendedStyleId);
     setErrorMessage(null);
+    const recVoice = VOICE_OPTIONS.find((v) => v.id === sample.recommendedVoice);
+    if (recVoice && voiceFilter !== "all" && voiceFilter !== recVoice.gender) {
+      setVoiceFilter(recVoice.gender);
+    }
   };
 
   const handleGenerate = async () => {
@@ -207,7 +224,7 @@ export default function App() {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         createdAt: timeFormatted,
         text: cleanText,
-        voiceName: payload.voiceName as MaleVoiceId,
+        voiceName: payload.voiceName as VoiceId,
         styleLabel: selectedStyle.label,
         sampleRate: payload.sampleRate,
         durationSeconds: payload.durationSeconds,
@@ -264,7 +281,7 @@ export default function App() {
             Text-to-Speech Bahasa Indonesia
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-base">
-            Ubah naskah Bahasa Indonesia menjadi suara pria yang natural dan jernih.
+            Ubah naskah Bahasa Indonesia menjadi suara cewek atau cowok yang lembut, natural, dan jernih.
             Putar langsung hasilnya atau unduh dalam format WAV dan MP3.
           </p>
         </div>
@@ -415,28 +432,59 @@ export default function App() {
             />
           </div>
 
-          {/* Right Column: Male Voice Selector & Natural Speaking Style */}
+          {/* Right Column: Voice Selector & Natural Speaking Style */}
           <aside className="space-y-6 lg:col-span-5">
             <section
-              id="suara-pria"
-              aria-label="Pilihan suara pria"
+              id="pilihan-suara"
+              aria-label="Pilihan suara"
               className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
             >
               <div className="border-b border-slate-100 pb-4">
-                <h2 className="text-base font-semibold text-slate-900">
-                  Pilihan Suara Pria
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Pilih karakter vokal pria yang paling sesuai dengan kebutuhan naskah.
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Pilihan Suara
+                  </h2>
+
+                  <div
+                    role="tablist"
+                    aria-label="Filter suara"
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1"
+                  >
+                    {(
+                      [
+                        { id: "all", label: "Semua" },
+                        { id: "female", label: "Cewek" },
+                        { id: "male", label: "Cowok" },
+                      ] as const
+                    ).map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={voiceFilter === tab.id}
+                        onClick={() => setVoiceFilter(tab.id)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                          voiceFilter === tab.id
+                            ? "bg-white text-slate-900 shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Tersedia karakter suara cewek dan cowok yang lembut untuk cerita kehidupan.
                 </p>
               </div>
 
               <div
                 role="radiogroup"
-                aria-label="Daftar suara pria"
-                className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1"
+                aria-label="Daftar pilihan suara"
+                className="mt-4 grid max-h-[430px] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-1"
               >
-                {MALE_VOICES.map((voice) => {
+                {filteredVoices.map((voice) => {
                   const isSelected = selectedVoice === voice.id;
                   return (
                     <button
@@ -452,16 +500,24 @@ export default function App() {
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-semibold text-slate-900">
                             {voice.name}
                           </span>
-                          <span aria-hidden="true" className="text-slate-300">
-                            ·
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              voice.gender === "female"
+                                ? "bg-rose-50 text-rose-700"
+                                : "bg-sky-50 text-sky-700"
+                            }`}
+                          >
+                            {voice.gender === "female" ? "Cewek" : "Cowok"}
                           </span>
-                          <span className="text-xs font-medium text-slate-600">
-                            {voice.character}
-                          </span>
+                          {voice.isSoftStory && (
+                            <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                              Lembut · Cerita
+                            </span>
+                          )}
                         </div>
 
                         {isSelected && (
@@ -472,7 +528,10 @@ export default function App() {
                         )}
                       </div>
 
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                      <p className="mt-1 text-xs font-medium text-slate-700">
+                        {voice.character}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
                         {voice.description}
                       </p>
                       <p className="mt-1.5 text-[11px] text-slate-500">
@@ -563,7 +622,7 @@ export default function App() {
                 Riwayat Audio Sesi Ini
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
-                Bandingkan hasil antar suara pria atau unduh ulang file WAV dan MP3.
+                Bandingkan hasil antar karakter suara atau unduh ulang file WAV dan MP3.
               </p>
             </div>
 

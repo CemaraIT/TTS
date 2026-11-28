@@ -198,7 +198,7 @@ export function AudioPlayerCard({
                 Belum ada audio yang dibuat
               </p>
               <p className="text-xs text-slate-500">
-                Tulis naskah di atas, pilih suara pria, lalu tekan tombol Buat Audio.
+                Tulis naskah di atas, pilih karakter suara, lalu tekan tombol Buat Audio.
               </p>
             </div>
           </div>

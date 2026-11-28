@@ -34,7 +34,7 @@ export function Header({
             Studio Naskah
           </a>
           <a
-            href="#suara-pria"
+            href="#pilihan-suara"
             className="shrink-0 whitespace-nowrap transition-colors hover:text-slate-900"
           >
             Pilihan Suara

@@ -1,11 +1,26 @@
-export type MaleVoiceId = "Puck" | "Charon" | "Fenrir" | "Orus";
+export type VoiceGender = "female" | "male";
 
-export interface MaleVoiceOption {
-  id: MaleVoiceId;
+export type VoiceId =
+  | "Vindemiatrix"
+  | "Sulafat"
+  | "Achernar"
+  | "Aoede"
+  | "Achird"
+  | "Algieba"
+  | "Enceladus"
+  | "Orus"
+  | "Puck"
+  | "Charon"
+  | "Fenrir";
+
+export interface VoiceOption {
+  id: VoiceId;
   name: string;
+  gender: VoiceGender;
   character: string;
   description: string;
   bestFor: string;
+  isSoftStory?: boolean;
 }
 
 export interface SpeakingStylePreset {
@@ -18,7 +33,7 @@ export interface SpeakingStylePreset {
 export interface SampleScript {
   id: string;
   label: string;
-  recommendedVoice: MaleVoiceId;
+  recommendedVoice: VoiceId;
   recommendedStyleId: string;
   text: string;
 }
@@ -27,7 +42,7 @@ export interface GeneratedAudioTake {
   id: string;
   createdAt: string;
   text: string;
-  voiceName: MaleVoiceId;
+  voiceName: VoiceId;
   styleLabel: string;
   sampleRate: number;
   durationSeconds: number;
